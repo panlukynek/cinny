@@ -2,7 +2,7 @@ import React from 'react';
 import { MsgType } from 'matrix-js-sdk';
 import { HTMLReactParserOptions } from 'html-react-parser';
 import { Opts } from 'linkifyjs';
-import { config } from 'folds';
+import { Box, config } from 'folds';
 import {
   AudioContent,
   DownloadFile,
@@ -24,13 +24,14 @@ import {
   UnsupportedContent,
   VideoContent,
 } from './message';
-import { UrlPreviewCard, UrlPreviewHolder } from './url-preview';
+import { GifUrlPreview, UrlPreviewCard, UrlPreviewHolder } from './url-preview';
 import { Image, MediaControl, Video } from './media';
 import { ImageViewer } from './image-viewer';
 import { PdfViewer } from './Pdf-viewer';
 import { TextViewer } from './text-viewer';
 import { testMatrixTo } from '../plugins/matrix-to';
 import { IImageContent } from '../../types/matrix/common';
+import { isGifUrl } from '../utils/gif';
 
 type RenderMessageContentProps = {
   displayName: string;
@@ -61,12 +62,27 @@ export function RenderMessageContent({
   const renderUrlsPreview = (urls: string[]) => {
     const filteredUrls = urls.filter((url) => !testMatrixTo(url));
     if (filteredUrls.length === 0) return undefined;
+    // Render GIF/animated links (Tenor, Giphy, direct .gif, ...) as inline,
+    // auto-playing media instead of a static link-preview card.
+    const gifUrls = filteredUrls.filter(isGifUrl);
+    const cardUrls = filteredUrls.filter((url) => !isGifUrl(url));
     return (
-      <UrlPreviewHolder>
-        {filteredUrls.map((url) => (
-          <UrlPreviewCard key={url} url={url} ts={ts} />
-        ))}
-      </UrlPreviewHolder>
+      <>
+        {gifUrls.length > 0 && (
+          <Box direction="Column" gap="200" style={{ marginTop: config.space.S200 }}>
+            {gifUrls.map((url) => (
+              <GifUrlPreview key={url} url={url} ts={ts} autoPlay={mediaAutoLoad} />
+            ))}
+          </Box>
+        )}
+        {cardUrls.length > 0 && (
+          <UrlPreviewHolder>
+            {cardUrls.map((url) => (
+              <UrlPreviewCard key={url} url={url} ts={ts} />
+            ))}
+          </UrlPreviewHolder>
+        )}
+      </>
     );
   };
   const renderCaption = () => {

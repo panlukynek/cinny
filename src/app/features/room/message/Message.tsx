@@ -31,7 +31,7 @@ import React, {
   useState,
 } from 'react';
 import FocusTrap from 'focus-trap-react';
-import { useHover, useFocusWithin } from 'react-aria';
+import { useHover, useFocusWithin, mergeProps } from 'react-aria';
 import { MatrixEvent, Room } from 'matrix-js-sdk';
 import { Relations } from 'matrix-js-sdk/lib/models/relations';
 import classNames from 'classnames';
@@ -75,6 +75,7 @@ import { getMatrixToRoomEvent } from '../../../plugins/matrix-to';
 import { getViaServers } from '../../../plugins/via-servers';
 import { useMediaAuthentication } from '../../../hooks/useMediaAuthentication';
 import { useRoomPinnedEvents } from '../../../hooks/useRoomPinnedEvents';
+import { LongPressCoords, useLongPress } from '../../../hooks/useLongPress';
 import { MemberPowerTag, StateEvent } from '../../../../types/matrix/room';
 import { PowerIcon } from '../../../components/power';
 import colorMXID from '../../../../util/colorMXID';
@@ -728,6 +729,22 @@ export const Message = as<'div', MessageProps>(
     const [menuAnchor, setMenuAnchor] = useState<RectCords>();
     const [emojiBoardAnchor, setEmojiBoardAnchor] = useState<RectCords>();
 
+    // Open the message options menu on touch long-press, so reply/react/etc.
+    // are reachable on mobile where there is no hover.
+    const handleLongPress = useCallback(
+      ({ x, y, target }: LongPressCoords) => {
+        if (edit) return;
+        const tag = (target as HTMLElement | null)?.tagName?.toLowerCase();
+        // Don't hijack long-press on links/media, or while selecting text.
+        if (tag === 'a' || tag === 'img' || tag === 'video' || tag === 'button') return;
+        if (window.getSelection()?.isCollapsed === false) return;
+        navigator.vibrate?.(10);
+        setMenuAnchor((prev) => prev ?? { x, y, width: 0, height: 0 });
+      },
+      [edit]
+    );
+    const longPressHandlers = useLongPress(handleLongPress);
+
     const senderDisplayName =
       getMemberDisplayName(room, senderId) ?? getMxIdLocalPart(senderId) ?? senderId;
     const senderAvatarMxc = getMemberAvatarMxc(room, senderId);
@@ -884,9 +901,7 @@ export const Message = as<'div', MessageProps>(
         collapse={collapse}
         highlight={highlight}
         selected={!!menuAnchor || !!emojiBoardAnchor}
-        {...props}
-        {...hoverProps}
-        {...focusWithinProps}
+        {...mergeProps(props, hoverProps, focusWithinProps, longPressHandlers)}
         ref={ref}
       >
         {!edit && (hover || !!menuAnchor || !!emojiBoardAnchor) && (
